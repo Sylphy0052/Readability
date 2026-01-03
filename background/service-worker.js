@@ -1,8 +1,8 @@
 // Background Service Worker
-console.log('AI Markdown Crawler: Service Worker Loaded');
+console.log('Readability: Service Worker Loaded');
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('AI Markdown Crawler installed');
+  console.log('Readability installed');
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -157,22 +157,40 @@ async function processQueue() {
       console.log(`Fetching: ${url} (Depth: ${depth})`);
       let htmlText = '';
       try {
+        const renderStart = performance.now();
         htmlText = await fetchRenderedHtml(url);
+        const renderMs = Math.round(performance.now() - renderStart);
+        console.log(`Rendered HTML fetched in ${renderMs}ms (len=${htmlText.length})`);
       } catch (e) {
         console.warn('Rendered fetch failed, falling back to fetch()', e);
       }
       if (!htmlText) {
+        const fetchStart = performance.now();
         const response = await fetch(url);
         htmlText = await response.text();
+        const fetchMs = Math.round(performance.now() - fetchStart);
+        console.log(`Raw HTML fetched in ${fetchMs}ms (len=${htmlText.length})`);
       }
 
       // Parse via Offscreen
+      const parseStart = performance.now();
       const result = await parseInOffscreen(htmlText, url);
+      const parseMs = Math.round(performance.now() - parseStart);
+      console.log(`Offscreen parse finished in ${parseMs}ms`);
       
       if (result) {
+        let content = result.content;
+        if (crawlerConfig.aiOptions?.format) {
+          try {
+            content = await formatInPage(result.content);
+          } catch (e) {
+            console.error('AI format failed in page context', e);
+          }
+        }
         // Add to results
         crawlResults.push({
           ...result,
+          content: content,
           depth: depth
         });
 
@@ -298,34 +316,42 @@ async function parseInOffscreen(html, url) {
   // So I can't use the response of sendMessage directly if I use that pattern.
   // I will switch to a Promise wrapper listening for PARSE_COMPLETE.
   
-  return new Promise((resolve) => {
+  const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const attemptParse = () => new Promise((resolve) => {
     const listener = (message) => {
-      if (message.type === 'PARSE_COMPLETE' && message.origUrl === url) {
+      if (message.type === 'PARSE_COMPLETE' && message.origUrl === url && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
         resolve(message.payload);
       }
     };
     chrome.runtime.onMessage.addListener(listener);
-    
+
     // Trigger
     chrome.runtime.sendMessage({
       type: 'PARSE_HTML',
-      payload: { 
-          html, 
-          url,
-          options: {
-              aiFormat: crawlerConfig.aiOptions?.format,
-              aiSummary: crawlerConfig.aiOptions?.summary
-          }
+      payload: {
+        html,
+        url,
+        requestId,
+        options: {
+          aiFormat: false,
+          aiSummary: false
+        }
       }
     });
-    
+
     // Timeout fallback
     setTimeout(() => {
-        chrome.runtime.onMessage.removeListener(listener);
-        resolve(null);
-    }, 10000);
+      chrome.runtime.onMessage.removeListener(listener);
+      resolve(null);
+    }, 30000);
   });
+
+  const result = await attemptParse();
+  if (result === null) {
+    console.warn('Offscreen parse timed out:', url);
+  }
+  return result;
 }
 
 async function setupOffscreenDocument(path) {
@@ -350,6 +376,89 @@ async function setupOffscreenDocument(path) {
     await creatingOffscreenPromise;
     creatingOffscreenPromise = null;
   }
+}
+
+async function formatInPage(markdown) {
+  const trimmed = markdown.substring(0, 10000);
+  return await withAIAgentTab(async (tabId) => {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      args: [trimmed],
+      func: async (inputText) => {
+        try {
+          if (typeof LanguageModel === 'undefined') {
+            return { ok: false, error: 'AI API not available' };
+          }
+          const availability = await LanguageModel.availability({
+            expectedInputs: [{ type: 'text', languages: ['en', 'ja'] }],
+            expectedOutputs: [{ type: 'text', languages: ['ja'] }]
+          });
+          if (availability === 'no' || availability === 'unavailable') {
+            return { ok: false, error: 'AI not available' };
+          }
+          if (availability === 'after-download') {
+            return { ok: false, error: 'AI model downloading' };
+          }
+          const session = await LanguageModel.create({
+            systemPrompt: 'You are an expert technical writer. You improve Markdown documentation.',
+            expectedInputs: [{ type: 'text', languages: ['en', 'ja'] }],
+            expectedOutputs: [{ type: 'text', languages: ['ja'] }]
+          });
+          const prompt = `Fix the following Markdown content.\n- Remove excessive newlines.\n- Ensure code blocks have language tags if possible.\n- Fix broken headers.\n- Do not summarize, keep all details.\n\nContent:\n${inputText}`;
+          const result = await session.prompt(prompt);
+          session.destroy();
+          return { ok: true, text: result };
+        } catch (e) {
+          return { ok: false, error: e?.message || 'AI format failed' };
+        }
+      }
+    });
+    const payload = results?.[0]?.result;
+    if (!payload) {
+      throw new Error('AI format returned empty result');
+    }
+    if (!payload.ok) {
+      throw new Error(payload.error || 'AI format failed');
+    }
+    return payload.text || null;
+  });
+}
+
+async function withAIAgentTab(run) {
+  const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const activeUrl = active?.url || '';
+  const isActiveUsable = active?.id && !activeUrl.startsWith('chrome://') && !activeUrl.startsWith('chrome-extension://');
+  let tempTabId = null;
+  let tabId = null;
+
+  if (isActiveUsable) {
+    tabId = active.id;
+  } else {
+    const tempTab = await chrome.tabs.create({ url: 'https://example.com/', active: false });
+    tabId = tempTab.id;
+    tempTabId = tempTab.id;
+    await waitForTabComplete(tabId);
+  }
+
+  try {
+    return await run(tabId);
+  } finally {
+    if (tempTabId !== null) {
+      chrome.tabs.remove(tempTabId).catch(() => {});
+    }
+  }
+}
+
+async function waitForTabComplete(tabId) {
+  return new Promise((resolve) => {
+    function onUpdated(updatedTabId, info) {
+      if (updatedTabId === tabId && info.status === 'complete') {
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(onUpdated);
+  });
 }
 
 function stopCrawl() {
