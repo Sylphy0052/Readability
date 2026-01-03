@@ -2,7 +2,7 @@
 
 ## 1. はじめに
 
-本ドキュメントは、AI Markdown Crawler (Chrome Extension) の要件を定義するものである。本システムは、指定されたURLからウェブサイトを巡回し、AIを活用して高品質なMarkdownドキュメントを生成することを目的とする。
+本ドキュメントは、Readability (Chrome Extension) の要件を定義するものである。本システムは、指定されたURLからウェブサイトを巡回し、AIを活用して高品質なMarkdownドキュメントを生成することを目的とする。
 
 ## 2. ユーザー要件
 

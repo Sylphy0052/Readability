@@ -25,6 +25,17 @@
         font-weight: bold;
         margin-bottom: 4px;
       }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .checkbox-row label {
+        display: inline;
+        font-weight: normal;
+        margin: 0;
+      }
       .radio-group label {
         display: inline;
         font-weight: normal;
@@ -67,7 +78,7 @@
     </style>
   </head>
   <body>
-    <h2>AI MD Crawler</h2>
+    <h2>Readability</h2>
 
     <div class="section" id="config-section">
       <div class="control-group">
@@ -91,15 +102,15 @@
 
       <div class="control-group">
         <label>AI Options</label>
-        <div>
+        <div class="checkbox-row">
           <input type="checkbox" id="opt-format" checked />
           <label for="opt-format">Auto-Format</label>
         </div>
-        <div>
+        <div class="checkbox-row">
           <input type="checkbox" id="opt-merge" />
           <label for="opt-merge">Merge Duplicates</label>
         </div>
-        <div>
+        <div class="checkbox-row">
           <input type="checkbox" id="opt-summary" />
           <label for="opt-summary">Generate Summary</label>
         </div>

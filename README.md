@@ -1,6 +1,6 @@
-# AI Markdown Crawler
+# Readability
 
-**AI Markdown Crawler** は、指定されたウェブサイトをクロールし、コンテンツを高品質な Markdown ドキュメントに一括変換する Google Chrome 拡張機能です。
+**Readability** は、指定されたウェブサイトをクロールし、コンテンツを高品質な Markdown ドキュメントに一括変換する Google Chrome 拡張機能です。
 Chrome に組み込まれた AI (Gemini Nano) を活用し、テキストの整形や要約をローカル環境で実行します。
 
 ## 特徴
@@ -54,7 +54,7 @@ Chrome に組み込まれた AI (Gemini Nano) を活用し、テキストの整�
 ## 使いかた
 
 1. ドキュメント化したいウェブサイトを開きます。
-2. Chrome のツールバーから **AI Markdown Crawler** のアイコンをクリックします。
+2. Chrome のツールバーから **Readability** のアイコンをクリックします。
 3. 設定を行います：
     * **Depth**: クロールする深さ（0=現在のページのみ、1=リンク先まで...）
     * **Scope**: リンクを辿る範囲（同一ドメインのみ or 外部ドメインも許可）

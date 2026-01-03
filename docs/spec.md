@@ -1,4 +1,4 @@
-# AI Markdown Crawler 仕様書 (Chrome Extension)
+# Readability 仕様書 (Chrome Extension)
 
 ## 1. 概要
 
