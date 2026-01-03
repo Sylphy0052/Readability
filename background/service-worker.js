@@ -53,6 +53,9 @@ async function startCrawl(config) {
     console.log('Crawl finished. Results:', crawlResults);
     
     // Generate and Download
+    if (crawlResults.length === 0) {
+      throw new Error('No pages were processed');
+    }
     await generateAndDownload(crawlResults, crawlerConfig);
 
     // Notify Completion
@@ -76,7 +79,9 @@ async function generateAndDownload(results, config) {
     let finalMarkdown = '';
 
     const mainTitle = results[0]?.title || 'Documentation';
-    const dateStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_` +
+      `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
 
     // Append pages
     results.forEach((page, index) => {
@@ -110,9 +115,16 @@ async function generateAndDownload(results, config) {
     
     reader.onloadend = function() {
         const base64data = reader.result;
+        const safeTitle = mainTitle
+          .replace(/\s+/g, '_')
+          .replace(/[^a-z0-9_]/gi, '_')
+          .replace(/_+/g, '_')
+          .replace(/^_+|_+$/g, '');
+        const maxTitleLength = 40;
+        const trimmedTitle = safeTitle.slice(0, maxTitleLength) || 'Documentation';
         chrome.downloads.download({
             url: base64data,
-            filename: `${mainTitle.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.md`,
+            filename: `${trimmedTitle}_${timestamp}.md`,
             saveAs: true
         });
     };
@@ -143,8 +155,16 @@ async function processQueue() {
 
     try {
       console.log(`Fetching: ${url} (Depth: ${depth})`);
-      const response = await fetch(url);
-      const htmlText = await response.text();
+      let htmlText = '';
+      try {
+        htmlText = await fetchRenderedHtml(url);
+      } catch (e) {
+        console.warn('Rendered fetch failed, falling back to fetch()', e);
+      }
+      if (!htmlText) {
+        const response = await fetch(url);
+        htmlText = await response.text();
+      }
 
       // Parse via Offscreen
       const result = await parseInOffscreen(htmlText, url);
@@ -205,6 +225,65 @@ function shouldFollow(link, currentUrl, scope) {
     }
     return false;
   } catch (e) { return false; }
+}
+
+async function fetchRenderedHtml(url) {
+  return new Promise((resolve, reject) => {
+    let tabId = null;
+    const timeoutMs = 15000;
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for tab load'));
+    }, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timeoutId);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      if (tabId !== null) {
+        chrome.tabs.remove(tabId).catch(() => {});
+      }
+    }
+
+    function onUpdated(updatedTabId, info) {
+      if (updatedTabId === tabId && info.status === 'complete') {
+        chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: async () => {
+            const maxWaitMs = 7000;
+            const pollIntervalMs = 200;
+            const start = Date.now();
+            function hasContent() {
+              const main = document.querySelector('main') || document.querySelector('article');
+              const textLen = document.body?.innerText?.trim().length || 0;
+              return Boolean(main) && textLen > 200;
+            }
+            while (Date.now() - start < maxWaitMs) {
+              if (hasContent()) break;
+              await new Promise((r) => setTimeout(r, pollIntervalMs));
+            }
+            return document.documentElement.outerHTML;
+          }
+        }).then((results) => {
+          const html = results?.[0]?.result || '';
+          cleanup();
+          resolve(html);
+        }).catch((err) => {
+          cleanup();
+          reject(err);
+        });
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.create({ url: url, active: false }, (tab) => {
+      if (!tab || typeof tab.id !== 'number') {
+        cleanup();
+        reject(new Error('Failed to create tab'));
+        return;
+      }
+      tabId = tab.id;
+    });
+  });
 }
 
 async function parseInOffscreen(html, url) {
