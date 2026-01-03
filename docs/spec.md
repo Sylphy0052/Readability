@@ -2,7 +2,7 @@
 
 ## 1. 概要
 
-本拡張機能は、指定されたURLから開始し、ウェブサイトを再帰的に巡回（クロール）して、全ページの本文情報を1つのMarkdownファイルに集約する。Chrome組み込みAI（Gemini Nano）を活用し、高度な整形、重複排除、要約を行う次世代のドキュメント作成ツールである。
+本拡張機能は、指定されたURLから開始し、ウェブサイトを再帰的に巡回（クロール）して、全ページの本文情報を1つのMarkdownファイルに集約する。Chrome組み込みAI（Gemini Nano）を活用し、Markdownの自動整形を行う。
 
 ## 2. 技術スタック
 
@@ -53,10 +53,8 @@ ai-markdown-crawler/
 ### 4.3 AIインテリジェンス (Gemini Nano)
 
 * **高品質整形**: 文脈に基づき、不適切な改行の修正、数式の保護、コードブロックの適正化を行う。
-* **重複内容の統合**: 複数ページに共通する定型文（フッター的文言や共通の注釈）を特定し、ドキュメント全体で1回のみ表示されるよう統合する。
-* **要約生成（選択式）**:
-  * 各セクションごとの小要約。
-  * ドキュメント冒頭への全体要約（Executive Summary）の生成。
+* **AI整形（選択式）**:
+  * 不自然な改行やMarkdown構造の崩れを整形。
 
 ### 4.4 出力 (Output)
 
@@ -67,21 +65,21 @@ ai-markdown-crawler/
 
 ## 5. 処理プロセスフロー
 
-1. **初期化**: ユーザーがPopupで深度、スコープ、AIオプション（要約・統合）を設定。
+1. **初期化**: ユーザーがPopupで深度、スコープ、AIオプション（整形）を設定。
 2. **リンク収集**: 現在のページから設定スコープに基づきリンクを抽出、キューに追加。
 3. **再帰的取得**:
     * バックグラウンドでページを取得。
     * `Readability` + `Turndown` で中間Markdownを生成。
-    * AI（Gemini Nano）で各セクションを一次整形。
+  * AI（Gemini Nano）で各セクションを一次整形。
 4. **ポストプロセス**:
-    * （オプション）全テキストをAIに渡し、重複排除と全体要約を実行。
+    * （オプション）全テキストをAIに渡し、Markdownを整形。
 5. **エクスポート**: `chrome.downloads` APIを使用してファイルを出力。
 
 ---
 
 ## 6. 注意点・制約
 
-* **AIコンテキスト制限**: Gemini Nanoの入力制限を超える長文は、セクション単位で分割してAIに渡す（Recursive Summarization方式）。
+* **AIコンテキスト制限**: Gemini Nanoの入力制限を超える長文は、入力を一部に絞って整形する。
 * **リソース消費**: ローカルAIと並行フェッチによる負荷を抑えるため、逐次処理（Sequential Processing）を基本とする。
 * **CORS**: `manifest.json` の `host_permissions` を適切に設定し、クロスドメイン通信を許可する。
 
@@ -92,7 +90,7 @@ ai-markdown-crawler/
 * **設定セクション**:
   * `Depth`: [ 0 | 1 | 2 | 3 ]
   * `Scope`: [ ( ) Same Domain  ( ) External (Body Links Only) ]
-  * `AI Intensity`: [ [x] Format [ ] Merge Duplicates [ ] Generate Summary ]
+  * `AI Intensity`: [ [x] Format ]
 * **進捗セクション**:
   * Progress: [====    ] 40% (2/5 pages)
   * Current Task: "Analyzing: <https://example.com/page2>..."

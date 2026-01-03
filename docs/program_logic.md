@@ -5,7 +5,7 @@
 ## 概要
 
 この拡張機能は、現在開いているページを起点に、指定した深さまでリンクを辿ってページを取得し、
-Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応じて Gemini Nano で整形・要約を行い、
+Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応じて Gemini Nano で整形を行い、
 最終的に 1 つの Markdown ファイルとしてダウンロードします。
 
 ## アーキテクチャ概要
@@ -18,7 +18,7 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
   - Offscreen Document に HTML 解析を委譲。
 - **Offscreen Document**（`offscreen/`）
   - DOMParser で HTML を DOM 化し、Readability/Turndown を実行。
-  - AI 整形・要約、リンク抽出を行い、結果を Background に返却。
+  - リンク抽出を行い、結果を Background に返却。
 - **Core Scripts**（`scripts/`）
   - Readability と Turndown のラッパ、AI 処理ラッパを提供。
 
@@ -50,7 +50,7 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
   1. DOMParser で HTML を DOM 化
   2. Readability で本文抽出
   3. Turndown で Markdown 変換
-  4. AI 整形 / 要約（オプション）
+  4. AI 整形（オプション）
   5. 本文リンク抽出
 - 解析結果を `PARSE_COMPLETE` で返却。
 
@@ -65,7 +65,6 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
 ### `scripts/ai-handler.js`
 - Chrome Built-in AI（Gemini Nano）向けのラッパ。
 - `AIHandler.formatMarkdown()`：Markdown の整形
-- `AIHandler.summarize()`：要約生成
 - `AIHandler.isAvailable()`：利用可能かどうか確認
 
 ### `popup/popup.html` / `popup/popup.js`
@@ -85,7 +84,7 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
    - `fetch()` で HTML 取得。
    - `parseInOffscreen()` で解析依頼。
 4. **Offscreen 解析**
-   - Readability → Turndown → AI整形/要約（任意）。
+   - Readability → Turndown → AI整形（任意）。
    - リンク抽出。
 5. **結果集約**
    - `crawlResults` に追加。
@@ -108,7 +107,6 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
 
 - 1 ページごとに `# Title` を見出しとして付与。
 - URL を引用ブロックで記載。
-- 要約がある場合は `## Summary` を追加。
 - ページ間に `---` で区切りを挿入。
 - 余分な改行を正規化。
 
@@ -116,8 +114,6 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
 
 - **Auto-Format**
   - Markdown の改行や見出し、コードブロックを整形。
-- **Generate Summary**
-  - 3〜5項目の要約を生成。
 - AI が利用不可の場合は自動的にスキップ。
 
 ## 依存ライブラリ
@@ -130,11 +126,9 @@ Readability.js で本文抽出、Turndown.js で Markdown 変換、必要に応�
 ## 注意点（現状コードに基づく）
 
 - `scope=external` の深さ制御は `depth` 値に依存。
-- `opt-merge`（重複マージ）は UI に存在するが、バックエンド処理未実装。
 - クロール中断は `isCrawling` フラグによる停止のみ。
 
 ## 追加調査の候補
 
-- `merge duplicates` の実装方法と UI 連携。
 - `external` スコープの厳密なルール化。
 - 解析失敗時の再試行やタイムアウト制御の強化。

@@ -99,11 +99,11 @@ interface Message {
 Gemini Nano (Chrome Built-in AI) とのインターフェース。
 
 * **役割**:
-  * `window.ai.languageModel` へのプロンプト送信。
-  * テキスト整形、要約生成。
+  * `LanguageModel` へのプロンプト送信。
+  * テキスト整形。
 * **プロンプト戦略**:
   * **整形**: "Fix line breaks and format code blocks in the following Markdown..."
-  * **要約**: "Summarize the following content in 3 bullet points..."
+  * **整形**: "Fix the following Markdown content..."
 
 ## 4. エラー処理設計
 

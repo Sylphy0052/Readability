@@ -33,11 +33,11 @@
 
 ### Phase 4: AI機能 (Gemini Nano) の統合
 
-* **目標**: 取得したMarkdownをAIで整形・要約する。
+* **目標**: 取得したMarkdownをAIで整形する。
 * **タスク**:
   1. `window.ai` API呼び出し用ラッパー (`ai-handler.js`) の作成。
   2. Prompt APIを用いたテキスト整形プロンプトのテストと実装。
-  3. Summarizer API (もしあれば) またはPrompt APIによる要約機能の実装。
+  3. Prompt APIによる整形機能の実装。
   4. Promptコンテキスト長制限への対策（分割処理など）。
 
 ### Phase 5: UIと出力の仕上げ
