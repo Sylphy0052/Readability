@@ -53,17 +53,15 @@ async function parseHtml({ html, url, options }) {
   let markdown = runTurndown(article.content);
 
   // 3. AI Processing (if configured)
-  // We assume AIHandler is loaded.
-  // config should be passed in message.payload.options
-  const options = message.payload.options || {};
-  
-  if (options.aiFormat) {
+  // options is already destructured from the function parameter
+
+  if (options?.aiFormat) {
      markdown = await AIHandler.formatMarkdown(markdown);
   }
   
   // 4. Summarize (if configured)
   let summary = null;
-  if (options.aiSummary) {
+  if (options?.aiSummary) {
      summary = await AIHandler.summarize(markdown);
   }
 
