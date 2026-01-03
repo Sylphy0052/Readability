@@ -15,14 +15,17 @@ async function checkAIAvailability() {
         const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             func: async () => {
-                if (!self.ai || !self.ai.languageModel) {
-                    return { available: false, status: 'not_found' };
-                }
                 try {
-                    const caps = await self.ai.languageModel.capabilities();
-                    if (caps.available === 'readily') {
+                    if (typeof LanguageModel === 'undefined') {
+                        return { available: false, status: 'not_found' };
+                    }
+                    const availability = await LanguageModel.availability({
+                        expectedInputs: [{ type: 'text', languages: ['en', 'ja'] }],
+                        expectedOutputs: [{ type: 'text', languages: ['ja'] }]
+                    });
+                    if (availability === 'available') {
                         return { available: true, status: 'ready' };
-                    } else if (caps.available === 'after-download') {
+                    } else if (availability === 'after-download') {
                         return { available: false, status: 'downloading' };
                     } else {
                         return { available: false, status: 'not_available' };
@@ -90,8 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const aiOptions = {
         format: document.getElementById('opt-format').checked,
-        summary: document.getElementById('opt-summary').checked,
-        merge: document.getElementById('opt-merge').checked
+        summary: false,
+        merge: false
       };
       // TODO: Send message to background
       chrome.runtime.sendMessage({ 
