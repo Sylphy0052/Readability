@@ -5,7 +5,7 @@
 
 function runTurndown(htmlContent) {
   if (typeof TurndownService === 'undefined') {
-    console.error('AI Markdown Crawler: TurndownService is undefined.');
+    console.error('Readability: TurndownService is undefined.');
     return '';
   }
 
@@ -25,7 +25,7 @@ function runTurndown(htmlContent) {
     const markdown = turndownService.turndown(htmlContent);
     return markdown;
   } catch (error) {
-    console.error('AI Markdown Crawler: Turndown failed', error);
+    console.error('Readability: Turndown failed', error);
     return '';
   }
 }

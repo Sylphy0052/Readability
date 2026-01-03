@@ -5,7 +5,7 @@
 
 function runReadability(docArg) {
   if (typeof Readability === 'undefined') {
-    console.error('AI Markdown Crawler: Readability is undefined.');
+    console.error('Readability: Readability is undefined.');
     return null;
   }
 
@@ -22,7 +22,7 @@ function runReadability(docArg) {
     const article = reader.parse();
     return article;
   } catch (error) {
-    console.error('AI Markdown Crawler: Readability failed', error);
+    console.error('Readability: Readability failed', error);
     return null;
   }
 }

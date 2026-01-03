@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Markdown Crawler",
+  "name": "Readability",
   "version": "1.0.0",
   "description": "Crawl websites and convert into a single Markdown file using Gemini Nano.",
   "permissions": [
