@@ -1,3 +1,82 @@
+async function checkAIAvailability() {
+    const logMessage = document.getElementById('log-message');
+
+    try {
+        // Get active tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+        if (!tab || !tab.id || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+            logMessage.textContent = 'Navigate to a webpage to check AI';
+            logMessage.style.color = 'orange';
+            return;
+        }
+
+        // Inject script to check AI availability in page context
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: async () => {
+                if (!self.ai || !self.ai.languageModel) {
+                    return { available: false, status: 'not_found' };
+                }
+                try {
+                    const caps = await self.ai.languageModel.capabilities();
+                    if (caps.available === 'readily') {
+                        return { available: true, status: 'ready' };
+                    } else if (caps.available === 'after-download') {
+                        return { available: false, status: 'downloading' };
+                    } else {
+                        return { available: false, status: 'not_available' };
+                    }
+                } catch (e) {
+                    return { available: false, status: 'error', message: e.message };
+                }
+            }
+        });
+
+        const result = results[0]?.result;
+
+        if (result?.available) {
+            logMessage.textContent = 'AI Ready (Gemini Nano)';
+            logMessage.style.color = 'green';
+        } else if (result?.status === 'downloading') {
+            logMessage.textContent = 'AI model downloading...';
+            logMessage.style.color = 'orange';
+        } else if (result?.status === 'not_found') {
+            logMessage.textContent = 'AI API not found. Enable flags?';
+            logMessage.style.color = 'red';
+            addSetupGuideLink(logMessage);
+        } else {
+            logMessage.textContent = 'AI not available: ' + (result?.status || 'unknown');
+            logMessage.style.color = 'red';
+        }
+    } catch (e) {
+        logMessage.textContent = 'Cannot check AI on this page';
+        logMessage.style.color = 'orange';
+        console.warn('AI check failed:', e);
+    }
+}
+
+function addSetupGuideLink(container) {
+    const link = document.createElement('a');
+    link.href = '#';
+    link.textContent = ' [Setup Guide]';
+    link.style.marginLeft = '4px';
+    link.onclick = (e) => {
+        e.preventDefault();
+        alert(
+            'To enable Gemini Nano:\n\n' +
+            '1. Go to chrome://flags/#optimization-guide-on-device-model\n' +
+            '   → Set to "Enabled BypassPerfRequirement"\n\n' +
+            '2. Go to chrome://flags/#prompt-api-for-gemini-nano\n' +
+            '   → Set to "Enabled"\n\n' +
+            '3. Restart Chrome\n\n' +
+            '4. Check chrome://components\n' +
+            '   → "Optimization Guide On Device Model" should show a version'
+        );
+    };
+    container.appendChild(link);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const btnStart = document.getElementById('btn-start');
     const btnCancel = document.getElementById('btn-cancel');
@@ -9,10 +88,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const depth = document.querySelector('input[name="depth"]:checked').value;
       const scope = document.querySelector('input[name="scope"]:checked').value;
       
+      const aiOptions = {
+        format: document.getElementById('opt-format').checked,
+        summary: document.getElementById('opt-summary').checked,
+        merge: document.getElementById('opt-merge').checked
+      };
       // TODO: Send message to background
       chrome.runtime.sendMessage({ 
         type: 'START_CRAWL', 
-        payload: { depth, scope } 
+        payload: { depth, scope, aiOptions } 
       });
       
       updateUIState(true);
@@ -29,33 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
       statusText.textContent = isRunning ? 'Crawling...' : 'Ready';
     }
 
-    // Check AI capabilities on load
-    if (window.ai && window.ai.languageModel) {
-        window.ai.languageModel.capabilities().then(caps => {
-            if (caps.available === 'no') {
-                document.getElementById('log-message').textContent = 'Warning: AI not available on this device/browser.';
-                document.getElementById('log-message').style.color = 'orange';
-            } else {
-                 document.getElementById('log-message').textContent = 'AI Ready (Gemini Nano)';
-                 document.getElementById('log-message').style.color = 'green';
-            }
-        }).catch(e => {
-            document.getElementById('log-message').textContent = 'Error checking AI: ' + e.message;
-        });
-    } else {
-         document.getElementById('log-message').textContent = 'AI API not found. Enable flags?';
-         document.getElementById('log-message').style.color = 'red';
-         
-         // User requested: "設定されていない場合エラーを表示し、手順を表示するようにしたいです。"
-         const link = document.createElement('a');
-         link.href = '#';
-         link.textContent = ' [Setup Guide]';
-         link.onclick = (e) => {
-             e.preventDefault();
-             alert('Please enable "Prompt API for Gemini Nano" in chrome://flags. You may need Chrome Canary.');
-         };
-         document.getElementById('log-message').appendChild(link);
-    }
+    // Check AI capabilities via content script injection
+    checkAIAvailability();
 
     // Listen for updates from Background
     chrome.runtime.onMessage.addListener((message) => {
