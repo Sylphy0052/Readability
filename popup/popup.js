@@ -146,6 +146,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Check if crawl is already running (recover state) upon popup open
-    // We would need to ask BG for state. 
-    // Skipped for MVP, but good to have if user re-opens popup.
+    chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (response) => {
+        if (chrome.runtime.lastError) {
+             // Background might not be ready or some other error, ignore.
+            return;
+        }
+        if (response && response.isCrawling) {
+            updateUIState(true);
+            statusText.textContent = `Processing: ${response.processed} done, ${response.queue} queued`;
+            // Initialize progress bar if we wanted to
+            const total = response.processed + response.queue;
+            const pct = total > 0 ? (response.processed / total) * 100 : 0;
+            document.getElementById('progress-fill').style.width = `${pct}%`;
+        }
+    });
   });
